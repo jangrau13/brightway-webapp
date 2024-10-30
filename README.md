@@ -20,3 +20,9 @@ Figure 1: Diagrammatic representation of the carbon accounting logic used in the
 Figure 2: Add description here!
 
 [^1]: [Carbon Accounting (Wikipedia)](https://en.wikipedia.org/wiki/Carbon_accounting)
+
+
+## How to run
+```
+panel serve app/index.py --dev  
+```
