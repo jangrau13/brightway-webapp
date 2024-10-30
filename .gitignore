@@ -168,3 +168,5 @@ cython_debug/
 bw_webapp_dev/
 
 .vscode
+
+app/constants.py
