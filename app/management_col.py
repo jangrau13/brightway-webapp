@@ -94,6 +94,7 @@ def button_action_perform_lca(event):
 
     # add chosen actvity to db
     src = panel_lca_instance.get_src_and_get_technosphere_and_biosphere(widget_autocomplete_product.value)
+    print('print src', src.as_dict())
     panel_lca_instance.set_chosen_activity(src)
     panel_lca_instance.set_chosen_method_and_unit(widget_select_method.value)
     panel_lca_instance.set_chosen_amount(widget_float_input_amount.value)

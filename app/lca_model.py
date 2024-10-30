@@ -105,8 +105,8 @@ class PanelLCA:
         biosphere_data = get_biosphere(selected_src)
         
         # Step 3: Add Technosphere nodes and edges to the Brightway database
+        # Inside `get_src_and_get_technosphere_and_biosphere` method
         for entry in technosphere_data:
-            # Sanitize codes for parent and child elements
             parent_code = create_sanitized_key(entry['parentElement'])
             child_code = create_sanitized_key(entry['childElement'])
             parent_name = entry['parent']
@@ -115,31 +115,33 @@ class PanelLCA:
             child_location = entry.get('location', 'GLO')
             parent_unit = entry.get('parentUnit', 'unitless')
             child_unit = entry.get('unit', 'unitless')
-            
+
             # Check if parent node exists; if not, create and save it
-            parent_node_search = database.search(parent_code)
-            parent_node = parent_node_search[0] if parent_node_search else database.new_node(
-                code=parent_code,
-                name=parent_name,
-                categories=('technosphere',),
-                location=parent_location,
-                unit=parent_unit,
-                type='process'
-            )
-            if not parent_node_search:
+            try:
+                parent_node = bd.get_node(database=self.db_name, code=parent_code)
+            except UnknownObject:
+                parent_node = database.new_node(
+                    code=parent_code,
+                    name=parent_name,
+                    categories=('technosphere',),
+                    location=parent_location,
+                    unit=parent_unit,
+                    type='process'
+                )
                 parent_node.save()
 
             # Check if child node exists; if not, create and save it
-            child_node_search = database.search(child_code)
-            child_node = child_node_search[0] if child_node_search else database.new_node(
-                code=child_code,
-                name=child_name,
-                categories=('technosphere',),
-                location=child_location,
-                unit=child_unit,
-                type='process'
-            )
-            if not child_node_search:
+            try:
+                child_node = bd.get_node(database=self.db_name, code=child_code)
+            except UnknownObject:
+                child_node = database.new_node(
+                    code=child_code,
+                    name=child_name,
+                    categories=('technosphere',),
+                    location=child_location,
+                    unit=child_unit,
+                    type='process'
+                )
                 child_node.save()
             
             # Add edge using `new_edge` if there is a defined exchange value
@@ -153,38 +155,39 @@ class PanelLCA:
                 except UnknownObject:
                     print(f"Error adding edge between {parent_code} and {child_code}")
 
-        # Step 4: Add Biosphere nodes and edges to the Brightway database
+        # Similarly, apply try-except in the biosphere section
         for entry in biosphere_data:
-            # Sanitize the code for the biosphere parent element
             parent_code = create_sanitized_key(entry['parentElement'])
             exchange_name = create_sanitized_key(entry['exchangeName'])
             exchange_unit = entry.get('unit', 'unitless')
-            
+
             # Check if biosphere parent node exists; if not, create and save it
-            parent_node_search = database.search(parent_code)
-            parent_node = parent_node_search[0] if parent_node_search else database.new_node(
-                code=parent_code,
-                name=entry['srcLabel'],
-                categories=('biosphere', entry.get('category', '')),
-                unit=exchange_unit,
-                type='emission'
-            )
-            if not parent_node_search:
+            try:
+                parent_node = bd.get_node(database=self.db_name, code=parent_code)
+            except UnknownObject:
+                parent_node = database.new_node(
+                    code=parent_code,
+                    name=entry['srcLabel'],
+                    categories=('biosphere', entry.get('category', '')),
+                    unit=exchange_unit,
+                    type='emission'
+                )
                 parent_node.save()
 
             # Check if exchange node exists; if not, create and save it
-            exchange_node_search = database.search(exchange_name)
-            exchange_node = exchange_node_search[0] if exchange_node_search else database.new_node(
-                code=exchange_name,
-                name=exchange_name,
-                categories=('biosphere', entry.get('subCategory', '')),
-                unit=exchange_unit,
-                type='emission'
-            )
-            if not exchange_node_search:
+            try:
+                exchange_node = bd.get_node(database=self.db_name, code=exchange_name)
+            except UnknownObject:
+                exchange_node = database.new_node(
+                    code=exchange_name,
+                    name=exchange_name,
+                    categories=('biosphere', entry.get('subCategory', '')),
+                    unit=exchange_unit,
+                    type='emission'
+                )
                 exchange_node.save()
             
-            # Add edge using `new_edge` if value is present
+            # Add edge if value is present
             if 'value' in entry and entry['value']:
                 try:
                     parent_node.new_edge(
@@ -192,11 +195,19 @@ class PanelLCA:
                         type='biosphere',
                         input=exchange_node.key
                     ).save()
+                    ipcc = bd.Method(('IPCC',))
+                    ipcc.write([
+                        (exchange_node.key, {'amount': 1, 'uncertainty_type': 3, 'loc': 1, 'scale': 0.05}),
+                    ])
                 except UnknownObject:
                     print(f"Error adding edge for biosphere {parent_code} and exchange {exchange_name}")
 
         santized_src = create_sanitized_key(selected_src)
-        return database.search(santized_src)[0]
+        print('loaded whole activity')
+        return bd.get_node(
+            database=self.db_name,
+            code=santized_src,
+        )
 
 
     def set_methods_objects(self):
@@ -261,13 +272,13 @@ class PanelLCA:
         self.dict_db_methods = dict_methods_enriched
         self.list_db_methods = list_methods_for_autocomplete
 
-    def set_chosen_activity(self, activity_name):
+    def set_chosen_activity(self, selected_node):
         """
         Sets `chosen_activity` to the Activity object of the chosen product.
         """
         self.chosen_activity: Activity = bd.get_node(
             database=self.db_name,
-            name=activity_name,
+            code=selected_node.as_dict()['code'],
         )
 
     def set_chosen_method_and_unit(self, method_value):
